@@ -1,5 +1,27 @@
 import numpy as np
+import tkinter as tk
 import random
+import keyboard
+
+
+class Main(tk.Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.master = master
+        self.pack()
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.button = tk.Button(self)
+        self.button['text'] = "Button!"
+        self.button['command'] = self.action()
+        self.button.pack(side='top')
+
+        self.quit = tk.Button(self, text="QUIT", fg="red", command=self.master.destroy)
+        self.quit.pack(side="bottom")
+
+    def action(self):
+        print('Hi')
 
 
 class Game:
@@ -15,26 +37,27 @@ class Game:
 
         self.__add_tile()
         self.__add_tile()
+        print(self.__map)
 
-        state = True
-        while state:
-            print(self.score)
-            print(self.__map)
-
-            action = input()
-            while action not in 'wasd':
-                action = input()
-
-            if action == 'w':
-                state = self.up()
-            elif action == 'a':
-                state = self.left()
-            elif action == 's':
-                state = self.down()
-            elif action == 'd':
-                state = self.right()
-
-        print('You scored:', self.score)
+        # state = True
+        # while state:
+        #     print(self.score)
+        #     print(self.__map)
+        #
+        #     action = input()
+        #     while action not in 'wasd':
+        #         action = input()
+        #
+        #     if action == 'w':
+        #         state = self.up()
+        #     elif action == 'a':
+        #         state = self.left()
+        #     elif action == 's':
+        #         state = self.down()
+        #     elif action == 'd':
+        #         state = self.right()
+        #
+        # print('You scored:', self.score)
 
     def __add_tile(self):
         """Adds new tile to game if there is an empty slot"""
@@ -95,6 +118,7 @@ class Game:
             pass
 
         self.__add_tile()
+        print(self.__map)
         return self.__can_continue()
 
     def up(self) -> bool:
@@ -134,5 +158,31 @@ class Game:
         return self.__shift()
 
 
+game_running = True
+game = Game()
+
+
+def handle_input(key_event: keyboard.KeyboardEvent):
+    global game, game_running
+
+    if key_event.name is 'w':
+        game_running = game.up()
+    elif key_event.name is 'a':
+        game_running = game.left()
+    elif key_event.name is 's':
+        game_running = game.down()
+    elif key_event.name is 'd':
+        game_running = game.right()
+    elif key_event.name is 'esc':
+        game_running = False
+        keyboard.unhook_all()
+
+
 if __name__ == '__main__':
-    g = Game()
+    # keyboard.on_press(handle_input, suppress=True)
+    # while game_running:
+    #     pass
+
+    root = tk.Tk()
+    app = Main(master=root)
+    app.mainloop()
