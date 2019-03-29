@@ -4,26 +4,6 @@ import random
 import keyboard
 
 
-class Main(tk.Frame):
-    def __init__(self, master=None):
-        super().__init__(master)
-        self.master = master
-        self.pack()
-        self.create_widgets()
-
-    def create_widgets(self):
-        self.button = tk.Button(self)
-        self.button['text'] = "Button!"
-        self.button['command'] = self.action()
-        self.button.pack(side='top')
-
-        self.quit = tk.Button(self, text="QUIT", fg="red", command=self.master.destroy)
-        self.quit.pack(side="bottom")
-
-    def action(self):
-        print('Hi')
-
-
 class Game:
     """Represents a single 2048 game instance"""
 
@@ -37,27 +17,6 @@ class Game:
 
         self.__add_tile()
         self.__add_tile()
-        print(self.__map)
-
-        # state = True
-        # while state:
-        #     print(self.score)
-        #     print(self.__map)
-        #
-        #     action = input()
-        #     while action not in 'wasd':
-        #         action = input()
-        #
-        #     if action == 'w':
-        #         state = self.up()
-        #     elif action == 'a':
-        #         state = self.left()
-        #     elif action == 's':
-        #         state = self.down()
-        #     elif action == 'd':
-        #         state = self.right()
-        #
-        # print('You scored:', self.score)
 
     def __add_tile(self):
         """Adds new tile to game if there is an empty slot"""
@@ -66,7 +25,7 @@ class Game:
             row = random.randint(0, 3)
             col = random.randint(0, 3)
             if self.__map[row][col] == 0:
-                self.__map[row][col] = 4 if random.random() < 0.2 else 2
+                self.__map[row][col] = 4 if random.random() < 0.1 else 2
                 self.__tile_count += 1
                 break
 
@@ -89,66 +48,85 @@ class Game:
         return False
 
     def __shift(self) -> bool:
-        """Shifts/Merges all tiles one tile the right until no more change is happening and adds one new tile
+        """Shifts/Merges all tiles one tile the right until no more change is happening and
+        adds one new tile if anything has changed
         :returns True if the game can continue, False otherwise"""
 
         def __iteration() -> bool:
             """Performs a single shift
             :returns True if something changed, False otherwise"""
 
-            changed = False
+            _changed = False
+            merge_list = list()
             for row in range(4):
-                for col in range(3):  # Last column can never be shifted to the right so it is ignored
+                for col in range(3)[::-1]:  # Last column can never be shifted to the right so it is ignored
                     # Perform merge if tile on the right is equal
-                    if self.__map[row][col] == self.__map[row][col + 1] and self.__map[row][col] != 0:
+                    if self.__map[row][col] == self.__map[row][col + 1] and self.__map[row][col] != 0 and \
+                            (row, col) not in merge_list:
                         self.__map[row][col] = 0
                         self.__map[row][col + 1] *= 2
                         self.__tile_count -= 1
                         self.score += self.__map[row][col + 1]
-                        changed = True
+                        _changed = True
+                        merge_list.append((row, col))
                     # Move tile if tile on the right is empty (aka. 0)
                     elif self.__map[row][col + 1] == 0 and self.__map[row][col] != 0:
                         self.__map[row][col + 1] = self.__map[row][col]
                         self.__map[row][col] = 0
-                        changed = True
+                        _changed = True
 
-            return changed
+            return _changed
 
-        while __iteration():  # Loop until no more change
-            pass
+        change_count = 0
+        while True:  # Loop until no more change
+            changed = __iteration()
+            if changed:  # Count changes to check if a tile needs to be added
+                change_count += 1
+            else:
+                break
 
-        self.__add_tile()
-        print(self.__map)
+        if change_count > 0:  # Check if a tile has been moved and add a new tile
+            self.__add_tile()
+
         return self.__can_continue()
 
+    def value_at(self, x: int, y: int) -> int:
+        """Returns the value of the tile at position (x, y)
+        :param x X coordinate
+        :param y Y coordinate
+        :returns value of tile at (x, y)
+        :raises Index error if index > 3 is passed"""
+
+        if x not in range(4) or y not in range(4):
+            raise IndexError()
+
+        return self.__map[x][y]
+
     def up(self) -> bool:
-        """Performs a up-shift by transposing, shifting right and transposing again and
-        flipping along the horizontal axis
+        """Performs a up-shift by rotating left thrice, shifting right and rotating once more
         :returns True if game can continue, False otherwise"""
 
-        self.__map = np.transpose(self.__map)
+        self.__map = np.rot90(self.__map, k=3)
         res = self.__shift()
-        self.__map = np.transpose(self.__map)
-        self.__map = np.flipud(self.__map)
-
+        self.__map = np.rot90(self.__map)
         return res
 
     def down(self) -> bool:
-        """Performs a down-shift by transposing, shifting right and transposing again
+        """Performs a down-shift by rotating left once, shifting right and rotating thrice
         :returns True if game can continue, False otherwise"""
 
-        self.__map = np.transpose(self.__map)
+        self.__map = np.rot90(self.__map)
         res = self.__shift()
-        self.__map = np.transpose(self.__map)
+        self.__map = np.rot90(self.__map, k=3)
         return res
 
     def left(self) -> bool:
-        """Performs a left-shift by flipping along the vertical axis, shifting right and flipping again
+        """Performs a left-shift by rotating left twice, shifting right and rotating twice again
         :returns True if game can continue, False otherwise"""
 
-        self.__map = np.fliplr(self.__map)
+        self.__map = np.rot90(self.__map, k=2)
         res = self.__shift()
-        self.__map = np.fliplr(self.__map)
+        self.__map = np.rot90(self.__map, k=2)
         return res
 
     def right(self) -> bool:
@@ -158,31 +136,70 @@ class Game:
         return self.__shift()
 
 
-game_running = True
-game = Game()
+class Main(tk.Frame):
+    """GUI for the game"""
 
+    __game = Game()  # current game instance
+    __game_running = True
 
-def handle_input(key_event: keyboard.KeyboardEvent):
-    global game, game_running
+    def __init__(self, master=None):
+        """Initiates a 5x4 grid with the game map in the bottom 4x4 fields and the score in the top right.
+        Keyboard capture is also started"""
 
-    if key_event.name is 'w':
-        game_running = game.up()
-    elif key_event.name is 'a':
-        game_running = game.left()
-    elif key_event.name is 's':
-        game_running = game.down()
-    elif key_event.name is 'd':
-        game_running = game.right()
-    elif key_event.name is 'esc':
-        game_running = False
-        keyboard.unhook_all()
+        super().__init__(master)
+        self.master = master
+        self.pack()
+
+        self.__tiles = [tk.Label(self) for _ in range(16)]
+        self.__scoreboard = tk.Label(self)
+        self.__create_window()
+        self.__update()
+
+        keyboard.on_press(self.__handle_input, suppress=True)
+
+    def __create_window(self):
+        """Sets up the window layout"""
+
+        for x in range(4):
+            for y in range(4):
+                self.__tiles[4 * x + y].grid(row=x+1, column=y)
+
+        self.__scoreboard.grid(row=0, column=3)
+
+    def __update(self):
+        """Updates all 16 tiles and the score with their current values"""
+
+        for x in range(4):
+            for y in range(4):
+                self.__tiles[4 * x + y]['text'] = self.__game.value_at(x, y)
+
+        self.__scoreboard['text'] = self.__game.score
+
+    def __handle_input(self, key_event: keyboard.KeyboardEvent):
+        """Manages the keyboard controls for the game
+        WASD or arrow keys can be used for control, escape to end the game
+        :param key_event latest key press by the user"""
+
+        if key_event.name in ['w', 'up']:
+            self.__game_running = self.__game.up()
+        elif key_event.name in ['a', 'left']:
+            self.__game_running = self.__game.left()
+        elif key_event.name in ['s', 'down']:
+            self.__game_running = self.__game.down()
+        elif key_event.name in ['d', 'right']:
+            self.__game_running = self.__game.right()
+        elif key_event.name is 'esc':
+            self.__game_running = False
+
+        self.__update()
+
+        if not self.__game_running:
+            keyboard.unhook_all()
+            self.quit()
+            print('You got', self.__game.score, 'points!')
 
 
 if __name__ == '__main__':
-    # keyboard.on_press(handle_input, suppress=True)
-    # while game_running:
-    #     pass
-
     root = tk.Tk()
     app = Main(master=root)
     app.mainloop()
